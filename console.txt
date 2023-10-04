@@ -1,0 +1,451 @@
+# Introduction
+## No day_of_week here
+GET /bytes-discuss-02/_search
+
+# Runtime fields - basic
+## Add a day_of_week field
+GET /bytes-discuss-02/_search
+{
+  "runtime_mappings": {
+    "question.day_of_week": {
+      "type": "keyword",
+      "script": {
+        "source": """
+        emit('Monday');
+        """
+      }
+    }
+  }
+}
+
+## Show it. It's not in _source
+GET /bytes-discuss-02/_search
+{
+  "runtime_mappings": {
+    "question.day_of_week": {
+      "type": "keyword",
+      "script": {
+        "source": """
+        emit('Monday');
+        """
+      }
+    }
+  },
+  "fields": [
+    "title",
+    "question.day_of_week"
+  ],
+  "_source": false
+}
+
+# Compute the day of the week
+## What is this Object?
+GET /bytes-discuss-02/_search
+{
+  "runtime_mappings": {
+    "question.day_of_week": {
+      "type": "keyword",
+      "script": {
+        "source": """
+        Debug.explain(doc['question.date'].value);
+        """
+      }
+    }
+  },
+  "fields": [
+    "title",
+    "question.day_of_week"
+  ],
+  "_source": false
+}
+
+## JavaDoc https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/ZonedDateTime.html
+## Look at the dayOfWeek
+GET /bytes-discuss-02/_search
+{
+  "runtime_mappings": {
+    "question.day_of_week": {
+      "type": "keyword",
+      "script": {
+        "source": """
+        Debug.explain(doc['question.date'].value.dayOfWeek);
+        """
+      }
+    }
+  },
+  "fields": [
+    "title",
+    "question.day_of_week"
+  ],
+  "_source": false
+}
+
+## DayOfWeek: https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/DayOfWeek.html
+## display the name
+GET /bytes-discuss-02/_search
+{
+  "runtime_mappings": {
+    "question.day_of_week": {
+      "type": "keyword",
+      "script": {
+        "source": """
+        Debug.explain(doc['question.date'].value.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ROOT));
+        """
+      }
+    }
+  },
+  "fields": [
+    "title",
+    "question.day_of_week"
+  ],
+  "_source": false
+}
+
+## Emit the name
+GET /bytes-discuss-02/_search
+{
+  "runtime_mappings": {
+    "question.day_of_week": {
+      "type": "keyword",
+      "script": {
+        "source": """
+        emit(doc['question.date'].value.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ROOT));
+        """
+      }
+    }
+  },
+  "fields": [
+    "title",
+    "question.day_of_week"
+  ],
+  "_source": false
+}
+
+## Emit also the name for the answer
+GET /bytes-discuss-02/_search
+{
+  "runtime_mappings": {
+    "question.day_of_week": {
+      "type": "keyword",
+      "script": {
+        "source": """
+        emit(doc['question.date'].value.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ROOT));
+        """
+      }
+    },
+    "solution.day_of_week": {
+      "type": "keyword",
+      "script": {
+        "source": """
+        emit(doc['solution.date'].value.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ROOT));
+        """
+      }
+    }
+  },
+  "fields": [
+    "title",
+    "question.day_of_week",
+    "solution.day_of_week"
+  ],
+  "_source": false
+}
+
+# Search for questions asked/answered over the week-end (Sat-Sun)
+GET /bytes-discuss-02/_search
+{
+  "runtime_mappings": {
+    "question.day_of_week": {
+      "type": "keyword",
+      "script": {
+        "source": """
+        emit(doc['question.date'].value.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ROOT));
+        """
+      }
+    },
+    "solution.day_of_week": {
+      "type": "keyword",
+      "script": {
+        "source": """
+        emit(doc['solution.date'].value.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ROOT));
+        """
+      }
+    }
+  },
+  "fields": [
+    "title",
+    "question.author.username",
+    "solution.author.username",
+    "question.day_of_week",
+    "solution.day_of_week"
+  ],
+  "query": {
+    "multi_match": {
+      "analyzer": "whitespace",
+      "query": "Saturday Sunday",
+      "fields": [
+        "*.day_of_week"
+      ]
+    }
+  }, 
+  "_source": false
+}
+
+# Response time
+## It's not super fast if we compare with a regular search...
+GET /bytes-discuss-02/_search 
+{
+  "query": {
+    "match": {
+      "question.text": "Elasticsearch"
+    }
+  }
+}
+
+## Add the runtime field to the mapping
+DELETE bytes-discuss-04
+PUT bytes-discuss-04
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "analysis": {
+      "filter": {
+        "english_stemmer": {
+          "type": "stemmer",
+          "language": "english"
+        }
+      },
+      "tokenizer": {
+        "char_group": {
+          "type": "char_group",
+          "tokenize_on_chars": [
+            "whitespace",
+            "punctuation"
+          ]
+        }
+      }, 
+      "analyzer": {
+        "html_analyzer": {
+          "filter": [ "lowercase" ],
+          "char_filter": [ "html_strip" ],
+          "tokenizer": "standard"
+        },
+        "title_analyzer": {
+          "char_filter": [ "html_strip" ],
+          "tokenizer": "char_group",
+          "filter": [ "lowercase", "english_stemmer" ]
+        },
+        "path_analyzer": {
+          "filter": [ "lowercase" ],
+          "tokenizer": "path_hierarchy"
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "category_name": {
+        "type": "keyword"
+      },
+      "duration": {
+        "type": "unsigned_long"
+      },
+      "question": {
+        "properties": {
+          "author": {
+            "properties": {
+              "avatar_template": {
+                "type": "text",
+                "analyzer": "path_analyzer"
+              },
+              "name": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword"
+                  }
+                }
+              },
+              "username": {
+                "type": "search_as_you_type"
+              }
+            }
+          },
+          "date": {
+            "type": "date"
+          },
+          "reads": {
+            "type": "short"
+          },
+          "text": {
+            "type": "text",
+            "analyzer": "html_analyzer"
+          },
+          "day_of_week": {
+            "type": "keyword",
+            "script": {
+              "source": """
+              emit(doc['question.date'].value.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ROOT));
+              """
+            }
+          }
+        }
+      },
+      "solution": {
+        "properties": {
+          "author": {
+            "properties": {
+              "avatar_template": {
+                "type": "text",
+                "analyzer": "path_analyzer"
+              },
+              "name": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword"
+                  }
+                }
+              },
+              "username": {
+                "type": "search_as_you_type"
+              }
+            }
+          },
+          "date": {
+            "type": "date"
+          },
+          "post_number": {
+            "type": "short"
+          },
+          "reads": {
+            "type": "short"
+          },
+          "text": {
+            "type": "text",
+            "analyzer": "html_analyzer"
+          },
+          "day_of_week": {
+            "type": "keyword",
+            "script": {
+              "source": """
+              emit(doc['solution.date'].value.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ROOT));
+              """
+            }
+          }
+        }
+      },
+      "title": {
+        "type": "text",
+        "analyzer": "title_analyzer"
+      },
+      "topic": {
+        "type": "unsigned_long"
+      }
+    }
+  }
+}
+
+## Reindex
+POST _reindex?refresh=true
+{
+  "source": {
+    "index": "bytes-discuss-02"
+  },
+  "dest": {
+    "index": "bytes-discuss-04"
+  }
+}
+
+## Search again for questions asked/answered over the week-end (Sat-Sun)
+GET /bytes-discuss-04/_search
+{
+  "fields": [
+    "title",
+    "question.author.username",
+    "solution.author.username",
+    "question.day_of_week",
+    "solution.day_of_week"
+  ],
+  "query": {
+    "multi_match": {
+      "analyzer": "whitespace",
+      "query": "Saturday Sunday",
+      "fields": [
+        "*.day_of_week"
+      ]
+    }
+  }, 
+  "_source": false
+}
+
+# Lookups (like a join?)
+DELETE bytes-discuss-categories
+PUT bytes-discuss-categories
+{
+  "mappings": {
+    "properties": {
+      "name": {
+        "type": "keyword"
+      },
+      "description": {
+        "type": "text"
+      }
+    }
+  }
+}
+POST bytes-discuss-categories/_bulk
+{ "index": { }}
+{ "name": "Elasticsearch", "description": "Elasticsearch is a distributed, RESTful search and analytics engine capable of addressing a growing number of use cases. As the heart of the Elastic Stack, it centrally stores your data for lightning fast search, fine‑tuned relevancy, and powerful analytics that scale with ease." }
+{ "index": { }}
+{ "name": "Kibana", "description": "Kibana is a free and open user interface that lets you visualize your Elasticsearch data and navigate the Elastic Stack. Do anything from tracking query load to understanding the way requests flow through your apps." }
+{ "index": { }}
+{ "name": "Logstash", "description": "Logstash is a free and open server-side data processing pipeline that ingests data from a multitude of sources, transforms it, and then sends it to your favorite \"stash.\"" }
+{ "index": { }}
+{ "name": "Beats", "description": "Beats is a free and open platform for single-purpose data shippers. They send data from hundreds or thousands of machines and systems to Logstash or Elasticsearch." }
+
+GET bytes-discuss-04/_search
+{
+  "runtime_mappings": {
+    "category_description": {
+        "type": "lookup", 
+        "target_index": "bytes-discuss-categories", 
+        "input_field": "category_name", 
+        "target_field": "name", 
+        "fetch_fields": [ "description" ]
+    }
+  },
+  "fields": [
+    "title",
+    "category_name",
+    "category_description"
+  ],
+  "_source": false
+}
+
+## But a lookup is not searchable
+GET bytes-discuss-04/_search
+{
+  "runtime_mappings": {
+    "category_description": {
+        "type": "lookup", 
+        "target_index": "bytes-discuss-categories", 
+        "input_field": "category_name", 
+        "target_field": "name", 
+        "fetch_fields": [ "description" ]
+    }
+  },
+  "fields": [
+    "title",
+    "category_name",
+    "category_description"
+  ],
+  "query": {
+    "match": {
+      "category_description": "Restful"
+    }
+  }, 
+  "_source": false
+}
