@@ -382,6 +382,10 @@ GET /bytes-discuss-04/_search
 }
 
 # Lookups (like a join?)
+## No category description
+GET bytes-discuss-04/_search
+
+## Add the reference index
 DELETE bytes-discuss-categories
 PUT bytes-discuss-categories
 {
@@ -406,6 +410,7 @@ POST bytes-discuss-categories/_bulk
 { "index": { }}
 { "name": "Beats", "description": "Beats is a free and open platform for single-purpose data shippers. They send data from hundreds or thousands of machines and systems to Logstash or Elasticsearch." }
 
+## Lookup
 GET bytes-discuss-04/_search
 {
   "runtime_mappings": {

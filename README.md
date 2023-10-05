@@ -477,6 +477,12 @@ GET /bytes-discuss-04/_search
 
 ## Lookups (like a join?)
 
+We are missing in our dataset a description of what to expect in a given category:
+
+```json
+GET bytes-discuss-04/_search
+```
+
 Let say we have an index containing a list of categories:
 
 ```json
